@@ -65,12 +65,12 @@
         window.addEventListener('DOMContentLoaded', () => {
             bootOwnerDashboardProcess();
         });
-
         function bootOwnerDashboardProcess() {
-            if (BIN_ID.includes("6a2ad78eda38895dfeae91c4") || MASTER_KEY.includes("$$2a$10$dL5CROJK6byW0zICwh8WH.W6QlinuAkcYJytKvOwRLFtMKraRTKum")) {
-                alert("Please add your real JSONBin ID and Master Key into the code script variables!");
-                return;
-            }
+        if (BIN_ID.includes("PASTE_YOUR") || MASTER_KEY.includes("PASTE_YOUR")) {
+        alert("Please add your real JSONBin ID and Master Key into the code script variables!");
+        return;
+    }
+
 
             // Create a web link to your companion sender.html file automatically
             const currentDirUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
