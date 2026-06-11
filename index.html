@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintShop Owner Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-slate-950 font-sans min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6">
+
+    <div class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        
+        <!-- Left Sidebar: Shop Dynamic QR Code Display -->
+        <div class="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col items-center text-center space-y-6">
+            <div>
+                <h1 class="text-xl font-black bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">🖨️ SHOP TERMINAL</h1>
+                <p class="text-xs text-slate-500 uppercase font-semibold tracking-widest mt-1">Live Queue Receiver</p>
+            </div>
+
+            <!-- This renders the QR code pointing directly to your sender.html page -->
+            <div class="bg-white p-4 rounded-2xl shadow-inner">
+                <div id="shopQrCode"></div>
+            </div>
+            
+            <div class="w-full text-left bg-slate-950/60 rounded-2xl p-4 border border-slate-800/80 text-xs text-slate-400 space-y-2">
+                <p class="font-bold text-slate-300 flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-ping"></span> Radar Online</p>
+                <p>Have the customer scan this with their phone camera. It sends them straight to your custom document upload webpage.</p>
+            </div>
+            
+            <button onclick="resetTerminalData()" class="text-xs text-slate-600 hover:text-red-400 transition underline">
+                Reset Terminal Link ID
+            </button>
+        </div>
+
+        <!-- Right Side Panel: Live Printing Job Feed Stream -->
+        <div class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-slate-800 pb-4 gap-2">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-100 flex items-center">
+                        📥 Active Print Queue 
+                        <span id="queueCountBadge" class="ml-3 text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-0.5 rounded-full font-black">0 Jobs</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Real-time listing of customer files and metadata</p>
+                </div>
+                <button onclick="clearSystemQueue()" class="text-xs bg-slate-950 hover:bg-red-950/30 border border-slate-800 hover:border-red-900/50 text-slate-400 hover:text-red-400 font-bold px-4 py-2 rounded-xl transition self-start">
+                    Clear Job History
+                </button>
+            </div>
+
+            <!-- Dynamic File Queue Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800/60 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <th class="py-3 px-4">File Details</th>
+                            <th class="py-3 px-4">Customer Printing Instructions</th>
+                            <th class="py-3 px-4">Time</th>
+                            <th class="py-3 px-4 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="queueTableBody" class="divide-y divide-slate-800/40 text-sm">
+                        <tr id="emptyQueueStateRow">
+                            <td colspan="4" class="py-12 text-center text-slate-500 font-medium">
+                                <div class="text-3xl mb-2">💤</div> No file transfers in queue yet.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CLOUD_API_ENDPOINT = "https://api.restful-api.dev/objects";
+        let masterQueueChannelId = localStorage.getItem('printshop_queue_id');
+        let dynamicLocalQueueMemory = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            bootOwnerDashboardProcess();
+        });
+
+        async function bootOwnerDashboardProcess() {
+            if (!masterQueueChannelId) {
+                try {
+                    const setupPacket = await fetch(CLOUD_API_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: "PrintShop_Terminal_System",
+                            data: { queue: [] }
+                        })
+                    });
+                    const initializationResult = await setupPacket.json();
+                    masterQueueChannelId = initializationResult.id;
+                    localStorage.setItem('printshop_queue_id', masterQueueChannelId);
+                } catch (e) {
+                    alert("Database routing sync error. Please check your internet connection.");
+                    return;
+                }
+            }
+
+            // Find the directory base address and map link straight to your separate sender.html file
+            const currentDirUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+            const externalCustomerAccessPath = `${currentDirUrl}sender.html?shop_inbox=${masterQueueChannelId}`;
+            
+            document.getElementById("shopQrCode").innerHTML = "";
+            new QRCode(document.getElementById("shopQrCode"), {
+                text: externalCustomerAccessPath,
+                width: 180,
+                height: 180,
+                colorDark : "#020617",
+                colorLight : "#ffffff"
+            });
+
+            setInterval(refreshDashboardInboundDataFeed, 2500);
+            refreshDashboardInboundDataFeed(); 
+        }
+
+        async function refreshDashboardInboundDataFeed() {
+            if (!masterQueueChannelId) return;
+            try {
+                const queryFeedDataStream = await fetch(`${CLOUD_API_ENDPOINT}/${masterQueueChannelId}`);
+                if (!queryFeedDataStream.ok) return;
+                const cloudPayloadResult = await queryFeedDataStream.json();
+
+                if (cloudPayloadResult.data && Array.isArray(cloudPayloadResult.data.queue)) {
+                    const verifiedCloudArray = cloudPayloadResult.data.queue;
+                    if (verifiedCloudArray.length > dynamicLocalQueueMemory.length) {
+                        triggerDashboardChimeAudioNotification();
+                    }
+                    dynamicLocalQueueMemory = verifiedCloudArray;
+                    renderDashboardQueueUI();
+                }
+            } catch (err) { console.log("Stream sync active."); }
+        }
+
+        function renderDashboardQueueUI() {
+            const tableBodyNodeTarget = document.getElementById('queueTableBody');
+            const totalCounterLabel = document.getElementById('queueCountBadge');
+            
+            totalCounterLabel.innerText = `${dynamicLocalQueueMemory.length} Job${dynamicLocalQueueMemory.length === 1 ? '' : 's'}`;
+
+            if (dynamicLocalQueueMemory.length === 0) {
+                tableBodyNodeTarget.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-12 text-center text-slate-500 font-medium">
+                            <div class="text-3xl mb-2">💤</div> No file transfers in queue yet.
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            let rowBuilderCollectorHTML = "";
+            const processedDisplayArray = [...dynamicLocalQueueMemory].reverse();
+
+            processedDisplayArray.forEach((item) => {
+                rowBuilderCollectorHTML += `
+                    <tr class="border-b border-slate-800/40 hover:bg-slate-900/50 transition">
+                        <td class="py-4 px-4 font-bold text-slate-200">
+                            <div class="truncate max-w-xs text-blue-400" title="${item.fileName}">${item.fileName}</div>
+                            <div class="text-xs text-slate-500 font-normal mt-0.5">${item.fileSize || 'Unknown'}</div>
+                        </td>
+                        <td class="py-4 px-4 text-slate-300 italic max-w-xs break-words bg-slate-950/20">
+                            ${item.instructions ? `💬 "${item.instructions}"` : '<span class="text-slate-600">No instructions given.</span>'}
+                        </td>
+                        <td class="py-4 px-4 text-xs text-slate-400 font-mono">${item.timestamp}</td>
+                        <td class="py-4 px-4 text-right">
+                            <a href="${item.fileDownloadUrl}" target="_blank" download class="inline-flex items-center bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition shadow-md">
+                                DOWNLOAD / PRINT 📥
+                            </a>
+                        </td>
+                    </tr>`;
+            });
+
+            tableBodyNodeTarget.innerHTML = rowBuilderCollectorHTML;
+        }
+
+        async function clearSystemQueue() {
+            if (!confirm("Wipe print dashboard clean?")) return;
+            try {
+                await fetch(`${CLOUD_API_ENDPOINT}/${masterQueueChannelId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: "PrintShop_Terminal_System",
+                        data: { queue: [] }
+                    })
+                });
+                dynamicLocalQueueMemory = [];
+                renderDashboardQueueUI();
+            } catch (e) { alert("Failed to clear database records."); }
+        }
+
+        function resetTerminalData() {
+            if (confirm("Reset current ID cache?")) {
+                localStorage.clear();
+                window.location.reload();
+            }
+        }
+
+        function triggerDashboardChimeAudioNotification() {
+            try {
+                const SoundAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = SoundAudioContext.createOscillator();
+                const gain = SoundAudioContext.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, SoundAudioContext.currentTime);
+                osc.connect(gain);
+                gain.connect(SoundAudioContext.destination);
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.00001, SoundAudioContext.currentTime + 0.4);
+                osc.stop(SoundAudioContext.currentTime + 0.4);
+            } catch(e) {}
+        }
+    </script>
+</body>
+</html>
+
