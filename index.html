@@ -148,36 +148,168 @@
                             <div class="text-3xl mb-2">💤</div> No file transfers in queue yet.
                         </td>
                     </tr>`;
+                return;<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintShop Mobile Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-slate-950 font-sans min-h-screen text-slate-100 p-4">
+
+    <div class="max-w-md mx-auto space-y-6">
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl text-center space-y-4">
+            <div>
+                <h1 class="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">🖨️ MOBILE HUB</h1>
+                <p class="text-xs text-slate-500 uppercase font-semibold tracking-widest mt-1">Live Print Receiver</p>
+            </div>
+
+            <div class="flex flex-col items-center justify-center space-y-3">
+                <div class="bg-white p-4 rounded-2xl shadow-md inline-block">
+                    <div id="shopQrCode"></div>
+                </div>
+                <p class="text-xs text-slate-400 px-4">Let customers scan this screen, or print it out once for your counter!</p>
+            </div>
+            
+            <div class="flex justify-between items-center pt-2 text-xs border-t border-slate-800">
+                <span class="text-slate-500 font-mono text-[10px]" id="displayShopId">Loading ID...</span>
+                <button onclick="resetTerminalData()" class="text-red-400 hover:underline">Reset System</button>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-100 flex items-center">
+                        📥 Job Queue 
+                        <span id="queueCountBadge" class="ml-2 text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full font-black">0</span>
+                    </h2>
+                </div>
+                <button onclick="clearSystemQueue()" class="text-[11px] bg-slate-950 hover:bg-red-950/30 border border-slate-800 text-slate-400 hover:text-red-400 font-bold px-3 py-1.5 rounded-xl transition">
+                    Clear All
+                </button>
+            </div>
+
+            <div id="queueCardsContainer" class="space-y-3">
+                <div id="emptyQueueState" class="py-8 text-center text-slate-500 text-sm font-medium">
+                    <div class="text-3xl mb-1">💤</div> No files waiting yet.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CLOUD_API_ENDPOINT = "https://api.restful-api.dev/objects";
+        let masterQueueChannelId = localStorage.getItem('printshop_queue_id');
+        let dynamicLocalQueueMemory = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            bootOwnerDashboardProcess();
+        });
+
+        async function bootOwnerDashboardProcess() {
+            if (!masterQueueChannelId) {
+                try {
+                    const setupPacket = await fetch(CLOUD_API_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: "PrintShop_Terminal_System",
+                            data: { queue: [] }
+                        })
+                    });
+                    const initializationResult = await setupPacket.json();
+                    masterQueueChannelId = initializationResult.id;
+                    localStorage.setItem('printshop_queue_id', masterQueueChannelId);
+                } catch (e) {
+                    alert("Connection error. Refresh the page.");
+                    return;
+                }
+            }
+
+            document.getElementById('displayShopId').innerText = `ID: ${masterQueueChannelId.substring(0,8)}...`;
+
+            // Map link straight to your separate sender.html file
+            const currentDirUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+            const externalCustomerAccessPath = `${currentDirUrl}sender.html?shop_inbox=${masterQueueChannelId}`;
+            
+            document.getElementById("shopQrCode").innerHTML = "";
+            new QRCode(document.getElementById("shopQrCode"), {
+                text: externalCustomerAccessPath,
+                width: 140,
+                height: 140,
+                colorDark : "#020617",
+                colorLight : "#ffffff"
+            });
+
+            setInterval(refreshDashboardInboundDataFeed, 3000);
+            refreshDashboardInboundDataFeed(); 
+        }
+
+        async function refreshDashboardInboundDataFeed() {
+            if (!masterQueueChannelId) return;
+            try {
+                const queryFeedDataStream = await fetch(`${CLOUD_API_ENDPOINT}/${masterQueueChannelId}`);
+                if (!queryFeedDataStream.ok) return;
+                const cloudPayloadResult = await queryFeedDataStream.json();
+
+                if (cloudPayloadResult.data && Array.isArray(cloudPayloadResult.data.queue)) {
+                    const verifiedCloudArray = cloudPayloadResult.data.queue;
+                    if (verifiedCloudArray.length > dynamicLocalQueueMemory.length) {
+                        triggerDashboardChimeAudioNotification();
+                    }
+                    dynamicLocalQueueMemory = verifiedCloudArray;
+                    renderDashboardQueueUI();
+                }
+            } catch (err) { console.log("Sync active..."); }
+        }
+
+        function renderDashboardQueueUI() {
+            const cardsContainer = document.getElementById('queueCardsContainer');
+            const totalCounterLabel = document.getElementById('queueCountBadge');
+            
+            totalCounterLabel.innerText = dynamicLocalQueueMemory.length;
+
+            if (dynamicLocalQueueMemory.length === 0) {
+                cardsContainer.innerHTML = `
+                    <div id="emptyQueueState" class="py-8 text-center text-slate-500 text-sm font-medium">
+                        <div class="text-3xl mb-1">💤</div> No files waiting yet.
+                    </div>`;
                 return;
             }
 
-            let rowBuilderCollectorHTML = "";
+            let htmlBuilder = "";
             const processedDisplayArray = [...dynamicLocalQueueMemory].reverse();
 
             processedDisplayArray.forEach((item) => {
-                rowBuilderCollectorHTML += `
-                    <tr class="border-b border-slate-800/40 hover:bg-slate-900/50 transition">
-                        <td class="py-4 px-4 font-bold text-slate-200">
-                            <div class="truncate max-w-xs text-blue-400" title="${item.fileName}">${item.fileName}</div>
-                            <div class="text-xs text-slate-500 font-normal mt-0.5">${item.fileSize || 'Unknown'}</div>
-                        </td>
-                        <td class="py-4 px-4 text-slate-300 italic max-w-xs break-words bg-slate-950/20">
-                            ${item.instructions ? `💬 "${item.instructions}"` : '<span class="text-slate-600">No instructions given.</span>'}
-                        </td>
-                        <td class="py-4 px-4 text-xs text-slate-400 font-mono">${item.timestamp}</td>
-                        <td class="py-4 px-4 text-right">
-                            <a href="${item.fileDownloadUrl}" target="_blank" download class="inline-flex items-center bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition shadow-md">
-                                DOWNLOAD / PRINT 📥
-                            </a>
-                        </td>
-                    </tr>`;
+                htmlBuilder += `
+                    <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 space-y-3 shadow-inner">
+                        <div class="flex justify-between items-start gap-2">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-blue-400 font-bold text-sm truncate" title="${item.fileName}">${item.fileName}</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">${item.fileSize || 'Unknown Size'} • ${item.timestamp}</p>
+                            </div>
+                        </div>
+                        
+                        ${item.instructions ? `
+                        <div class="bg-slate-900/60 text-xs text-slate-300 p-2.5 rounded-xl border border-slate-800 italic break-words">
+                            💬 "${item.instructions}"
+                        </div>` : ''}
+
+                        <a href="${item.fileDownloadUrl}" target="_blank" download class="w-full flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded-xl text-xs tracking-wide uppercase transition active:scale-95 shadow-md">
+                            Open / Print Document 📥
+                        </a>
+                    </div>`;
             });
 
-            tableBodyNodeTarget.innerHTML = rowBuilderCollectorHTML;
+            cardsContainer.innerHTML = htmlBuilder;
         }
 
         async function clearSystemQueue() {
-            if (!confirm("Wipe print dashboard clean?")) return;
+            if (!confirm("Wipe all active print jobs?")) return;
             try {
                 await fetch(`${CLOUD_API_ENDPOINT}/${masterQueueChannelId}`, {
                     method: 'PUT',
@@ -189,11 +321,11 @@
                 });
                 dynamicLocalQueueMemory = [];
                 renderDashboardQueueUI();
-            } catch (e) { alert("Failed to clear database records."); }
+            } catch (e) { alert("Failed to clear data."); }
         }
 
         function resetTerminalData() {
-            if (confirm("Reset current ID cache?")) {
+            if (confirm("Reset current System? This generates a fresh QR connection link.")) {
                 localStorage.clear();
                 window.location.reload();
             }
@@ -205,15 +337,14 @@
                 const osc = SoundAudioContext.createOscillator();
                 const gain = SoundAudioContext.createGain();
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, SoundAudioContext.currentTime);
+                osc.frequency.setValueAtTime(587.33, SoundAudioContext.currentTime); // D5 high chime note
                 osc.connect(gain);
                 gain.connect(SoundAudioContext.destination);
                 osc.start();
-                gain.gain.exponentialRampToValueAtTime(0.00001, SoundAudioContext.currentTime + 0.4);
-                osc.stop(SoundAudioContext.currentTime + 0.4);
+                gain.gain.exponentialRampToValueAtTime(0.00001, SoundAudioContext.currentTime + 0.3);
+                osc.stop(SoundAudioContext.currentTime + 0.3);
             } catch(e) {}
         }
     </script>
 </body>
 </html>
-
