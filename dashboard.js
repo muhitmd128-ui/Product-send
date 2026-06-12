@@ -83,7 +83,7 @@ window.completeOrder = function(orderId) {
   // --- NEW: Generate QR Code automatically ---
 // This creates the QR code pointing exactly to your customer menu URL
 new QRCode(document.getElementById("qrcode"), {
-    text: "https://github.com/muhitmd128-ui/Product-send.io/menu.html",
+    text: "https://muhitmd128-ui.github.io/Product-send/menu.html",
     width: 150,
     height: 150,
     colorDark : "#000000",
