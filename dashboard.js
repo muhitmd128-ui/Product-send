@@ -78,4 +78,15 @@ window.completeOrder = function(orderId) {
         const orderToRemove = ref(db, 'orders/' + orderId);
         remove(orderToRemove);
     }
-};
+  };
+  // --- NEW: Generate QR Code automatically ---
+// This creates the QR code pointing exactly to your customer menu URL
+new QRCode(document.getElementById("qrcode"), {
+    text: "https://d128-ui.github.io/menu.html",
+    width: 150,
+    height: 150,
+    colorDark : "#000000",
+    colorLight : "#ffffff",
+    correctLevel : QRCode.CorrectLevel.H
+});
+
