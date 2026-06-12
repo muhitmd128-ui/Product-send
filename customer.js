@@ -4,15 +4,15 @@ import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebas
 
 // TODO: Replace with your Firebase Config
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
+    apiKey: "AIzaSyDLyMcQX-mTkuIvbRW9FhytOu1O7ArIgcU",
+    authDomain: "orderlist-ef379.firebaseapp.com",
+    databaseURL: "https://orderlist-ef379-default-rtdb.firebaseio.com",
+    projectId: "orderlist-ef379",
+    storageBucket: "orderlist-ef379.firebasestorage.app",
+    messagingSenderId: "582459554056",
+    appId: "1:582459554056:web:8af59dd8f3ead69f6d54bd",
+    measurementId: "G-K2F238NLTB"
+  };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
